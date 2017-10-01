@@ -26,22 +26,24 @@ def main():
         'ethminer-version': '?',
     }
 
-    t0 = datetime.now()
+    t1 = datetime.now()
     while True:
+        t0 = t1
         sleep(sleep_time)
         t1 = datetime.now()
 
         ethminer_service.seek_realtime(t0)
-        entry = escape_ansi(ethminer_service.get_next())
+        entry = ethminer_service.get_next()
 
         solutions_found = 0
         solutions_accepted = 0
         jobs_received = 0
 
         while valid(entry, t0, t1):
+            message = escape_ansi(entry['MESSAGE'])
             ethminer_status_message_format = (
                 "  m  {}|ethminer  Speed  {} Mh/s    {}  [{}] Time: {}")
-            parsed = parse(ethminer_status_message_format, entry)
+            parsed = parse(ethminer_status_message_format, message)
             if parsed:
                 ts, total_hashrate, gpus_hashrate, _, running_time = parsed
                 report['hashrate'] = dict(
@@ -54,21 +56,21 @@ def main():
             cuda_solution_found_message_format = (
                 "  ℹ  {}|CUDA{}     Solution found;"
                 " Submitting solution to {} ...")
-            parsed = parse(cuda_solution_found_message_format, entry)
+            parsed = parse(cuda_solution_found_message_format, message)
             if parsed:
                 solutions_found += 1
                 continue
 
             stratum_solution_accepted_format = (
                 "  ℹ  {}|stratum    B-) Submitted and accepted.")
-            parsed = parse(stratum_solution_accepted_format, entry)
+            parsed = parse(stratum_solution_accepted_format, message)
             if parsed:
                 solutions_accepted += 1
                 continue
 
             stratum_new_job_message_format = (
                 "  ℹ  {}|stratum   Received new job {}")
-            parsed = parse(stratum_new_job_message_format, entry)
+            parsed = parse(stratum_new_job_message_format, message)
             if parsed:
                 jobs_received += 1
                 continue
