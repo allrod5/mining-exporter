@@ -48,12 +48,9 @@ def main():
             if parsed:
                 ts, total_hashrate, gpus_hashrate, _, running_time = parsed
                 REQUEST_TOTAL_HASHRATE.set(total_hashrate)
-                gpus_hashrates = [
-                    (k, float(v))
-                    for gpu in gpus_hashrate.split("  ")
-                    for k, v in gpu.split(" ")]
-                for gpu, hashrate in gpus_hashrates:
-                    REQUEST_GPUS_HASHRATE.labels(gpu).set(hashrate)
+                for gpu in gpus_hashrate.split("  "):
+                    label, value = gpu.split(' ')
+                    REQUEST_GPUS_HASHRATE.labels(label).set(value)
                 continue
 
             cuda_solution_found_message_format = (
