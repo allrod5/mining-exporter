@@ -13,7 +13,7 @@ from mining_exporter.utils import escape_ansi
 
 version = "0.1.0"
 
-REQUEST_TOTAL_HASHRATE = Gauge('total_hashrate', 'Total Hashrate', 'total')
+REQUEST_TOTAL_HASHRATE = Gauge('total_hashrate', 'Total Hashrate')
 REQUEST_GPUS_HASHRATE = Gauge('gpus_hashrate', 'GPUs Hashrates', ['gpu'])
 
 REQUEST_JOBS = Counter('jobs', 'Received jobs from Stratum')
