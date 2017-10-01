@@ -1,0 +1,3 @@
+prometheus_client==0.0.21
+systemd-python==234
+parse==1.8.2
