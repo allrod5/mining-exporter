@@ -13,12 +13,13 @@ from mining_exporter.utils import escape_ansi
 
 version = "0.1.0"
 
-REQUEST_TOTAL_HASHRATE = Gauge('total_hashrate', 'Total Hashrate')
-REQUEST_GPUS_HASHRATE = Gauge('gpus_hashrate', 'GPUs Hashrates', ['gpu'])
+REQUEST_TOTAL_HASHRATE = Gauge('ethminer_total_hashrate', 'Total Hashrate')
+REQUEST_GPUS_HASHRATE = Gauge(
+    'ethminer_gpus_hashrate', 'GPUs Hashrates', ['gpu'])
 
-REQUEST_JOBS = Counter('jobs', 'Received jobs from Stratum')
-REQUEST_SOLUTIONS = Counter('solutions', 'Total of solutions found')
-REQUEST_SHARES = Counter('shares', 'Total of solutions accepted')
+REQUEST_JOBS = Counter('ethminer_jobs', 'Received jobs from Stratum')
+REQUEST_SOLUTIONS = Counter('ethminer_solutions', 'Total of solutions found')
+REQUEST_SHARES = Counter('ethminer_shares', 'Total of solutions accepted')
 
 
 def main():
@@ -51,6 +52,7 @@ def main():
                 for gpu in gpus_hashrate.split("  "):
                     label, value = gpu.split(' ')
                     REQUEST_GPUS_HASHRATE.labels(label).set(value)
+                entry = ethminer_service.get_next()
                 continue
 
             cuda_solution_found_message_format = (
@@ -59,6 +61,7 @@ def main():
             parsed = parse(cuda_solution_found_message_format, message)
             if parsed:
                 REQUEST_SOLUTIONS.inc()
+                entry = ethminer_service.get_next()
                 continue
 
             stratum_solution_accepted_format = (
@@ -66,6 +69,7 @@ def main():
             parsed = parse(stratum_solution_accepted_format, message)
             if parsed:
                 REQUEST_SHARES.inc()
+                entry = ethminer_service.get_next()
                 continue
 
             stratum_new_job_message_format = (
@@ -73,7 +77,10 @@ def main():
             parsed = parse(stratum_new_job_message_format, message)
             if parsed:
                 REQUEST_JOBS.inc()
+                entry = ethminer_service.get_next()
                 continue
+
+            entry = ethminer_service.get_next()
 
 
 def valid(entry, t0, t1):
