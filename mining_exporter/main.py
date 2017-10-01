@@ -5,11 +5,20 @@ from time import sleep
 
 from parse import parse
 from prometheus_client import start_http_server
+from prometheus_client import Gauge
+from prometheus_client import Counter
 from systemd import journal
 
 from mining_exporter.utils import escape_ansi
 
 version = "0.1.0"
+
+REQUEST_TOTAL_HASHRATE = Gauge('total_hashrate', 'Total Hashrate', 'total')
+REQUEST_GPUS_HASHRATE = Gauge('gpus_hashrate', 'GPUs Hashrates', ['gpu'])
+
+REQUEST_JOBS = Counter('jobs', 'Received jobs from Stratum')
+REQUEST_SOLUTIONS = Counter('solutions', 'Total of solutions found')
+REQUEST_SHARES = Counter('shares', 'Total of solutions accepted')
 
 
 def main():
@@ -22,10 +31,6 @@ def main():
     ethminer_service = journal.Reader()
     ethminer_service.add_match(_SYSTEMD_UNIT='eth-miner.service')
 
-    report = {
-        'ethminer-version': '?',
-    }
-
     t1 = datetime.now()
     while True:
         t0 = t1
@@ -35,10 +40,6 @@ def main():
         ethminer_service.seek_realtime(t0)
         entry = ethminer_service.get_next()
 
-        solutions_found = 0
-        solutions_accepted = 0
-        jobs_received = 0
-
         while valid(entry, t0, t1):
             message = escape_ansi(entry['MESSAGE'])
             ethminer_status_message_format = (
@@ -46,11 +47,13 @@ def main():
             parsed = parse(ethminer_status_message_format, message)
             if parsed:
                 ts, total_hashrate, gpus_hashrate, _, running_time = parsed
-                report['hashrate'] = dict(
-                    [(k, float(v)) for gpu in gpus_hashrate.split("  ")
-                     for k, v in gpu.split(" ")],
-                    total=total_hashrate)
-                report['running_time'] = running_time
+                REQUEST_TOTAL_HASHRATE.labels(0).set(total_hashrate)
+                gpus_hashrates = [
+                    (k, float(v))
+                    for gpu in gpus_hashrate.split("  ")
+                    for k, v in gpu.split(" ")]
+                for gpu, hashrate in gpus_hashrates:
+                    REQUEST_GPUS_HASHRATE.labels(gpu).set(hashrate)
                 continue
 
             cuda_solution_found_message_format = (
@@ -58,26 +61,22 @@ def main():
                 " Submitting solution to {} ...")
             parsed = parse(cuda_solution_found_message_format, message)
             if parsed:
-                solutions_found += 1
+                REQUEST_SOLUTIONS.inc()
                 continue
 
             stratum_solution_accepted_format = (
                 "  ℹ  {}|stratum    B-) Submitted and accepted.")
             parsed = parse(stratum_solution_accepted_format, message)
             if parsed:
-                solutions_accepted += 1
+                REQUEST_SHARES.inc()
                 continue
 
             stratum_new_job_message_format = (
                 "  ℹ  {}|stratum   Received new job {}")
             parsed = parse(stratum_new_job_message_format, message)
             if parsed:
-                jobs_received += 1
+                REQUEST_JOBS.inc()
                 continue
-
-        report['solutions'] = solutions_found
-        report['shares'] = solutions_accepted
-        report['jobs'] = jobs_received
 
 
 def valid(entry, t0, t1):
