@@ -47,7 +47,7 @@ def main():
             parsed = parse(ethminer_status_message_format, message)
             if parsed:
                 ts, total_hashrate, gpus_hashrate, _, running_time = parsed
-                REQUEST_TOTAL_HASHRATE.labels(0).set(total_hashrate)
+                REQUEST_TOTAL_HASHRATE.set(total_hashrate)
                 gpus_hashrates = [
                     (k, float(v))
                     for gpu in gpus_hashrate.split("  ")
