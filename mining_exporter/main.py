@@ -6,7 +6,6 @@ from time import sleep
 from parse import parse
 from prometheus_client import start_http_server
 from prometheus_client import Gauge
-from prometheus_client import Counter
 from prometheus_client import Histogram
 from systemd import journal
 
@@ -30,9 +29,6 @@ def main():
 
     start_http_server(listen_port)
 
-    ethminer_service = journal.Reader()
-    ethminer_service.add_match(_SYSTEMD_UNIT='eth-miner.service')
-
     t1 = datetime.now()
     while True:
         t0 = t1
@@ -40,10 +36,13 @@ def main():
         t1 = datetime.now()
 
         total_hashrate = 0
+        gpus_hashrate = "gpu/0 0.0"
         jobs = 0
         solutions = 0
         shares = 0
 
+        ethminer_service = journal.Reader()
+        ethminer_service.add_match(_SYSTEMD_UNIT='eth-miner.service')
         ethminer_service.seek_realtime(t0)
         entry = ethminer_service.get_next()
 
@@ -54,10 +53,6 @@ def main():
             parsed = parse(ethminer_status_message_format, message)
             if parsed:
                 ts, total_hashrate, gpus_hashrate, _, running_time = parsed
-                REQUEST_TOTAL_HASHRATE.set(total_hashrate)
-                for gpu in gpus_hashrate.split("  "):
-                    label, value = gpu.split(' ')
-                    REQUEST_GPUS_HASHRATE.labels(label).set(value)
                 entry = ethminer_service.get_next()
                 continue
 
@@ -87,6 +82,10 @@ def main():
 
             entry = ethminer_service.get_next()
 
+        REQUEST_TOTAL_HASHRATE.set(total_hashrate)
+        for gpu in gpus_hashrate.split("  "):
+            label, value = gpu.split(' ')
+            REQUEST_GPUS_HASHRATE.labels(label).set(value)
         REQUEST_JOBS.observe(jobs)
         REQUEST_SOLUTIONS.observe(solutions)
         REQUEST_SHARES.observe(shares)
@@ -98,6 +97,8 @@ def main():
             "\tObserved {} solutions\n"
             "\tObserved {} shares\n"
             .format(total_hashrate, jobs, solutions, shares))
+
+        ethminer_service.close()
 
 
 def valid(entry, t0, t1):
