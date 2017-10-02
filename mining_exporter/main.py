@@ -57,7 +57,7 @@ def main():
 
             cuda_solution_found_message_format = (
                 "  ℹ  {}|CUDA{}     Solution found;"
-                " Submitting solution to {} ...")
+                " Submitting solution to {} ... ")
             parsed = parse(cuda_solution_found_message_format, message)
             if parsed:
                 REQUEST_SOLUTIONS.inc()
@@ -65,7 +65,7 @@ def main():
                 continue
 
             stratum_solution_accepted_format = (
-                "  ℹ  {}|stratum    B-) Submitted and accepted.")
+                "  ℹ  {}|stratum    B-) Submitted and accepted.  ")
             parsed = parse(stratum_solution_accepted_format, message)
             if parsed:
                 REQUEST_SHARES.inc()
