@@ -7,6 +7,7 @@ from parse import parse
 from prometheus_client import start_http_server
 from prometheus_client import Gauge
 from prometheus_client import Counter
+from prometheus_client import Histogram
 from systemd import journal
 
 from mining_exporter.utils import escape_ansi
@@ -17,9 +18,9 @@ REQUEST_TOTAL_HASHRATE = Gauge('ethminer_total_hashrate', 'Total Hashrate')
 REQUEST_GPUS_HASHRATE = Gauge(
     'ethminer_gpus_hashrate', 'GPUs Hashrates', ['gpu'])
 
-REQUEST_JOBS = Counter('ethminer_jobs', 'Received jobs from Stratum')
-REQUEST_SOLUTIONS = Counter('ethminer_solutions', 'Total of solutions found')
-REQUEST_SHARES = Counter('ethminer_shares', 'Total of solutions accepted')
+REQUEST_JOBS = Histogram('ethminer_jobs', 'Received jobs from Stratum')
+REQUEST_SOLUTIONS = Histogram('ethminer_solutions', 'Total of solutions found')
+REQUEST_SHARES = Histogram('ethminer_shares', 'Total of solutions accepted')
 
 
 def main():
@@ -38,6 +39,11 @@ def main():
         sleep(sleep_time)
         t1 = datetime.now()
 
+        total_hashrate = 0
+        jobs = 0
+        solutions = 0
+        shares = 0
+
         ethminer_service.seek_realtime(t0)
         entry = ethminer_service.get_next()
 
@@ -55,11 +61,19 @@ def main():
                 entry = ethminer_service.get_next()
                 continue
 
+            stratum_new_job_message_format = (
+                "  ℹ  {}|stratum   Received new job {}")
+            parsed = parse(stratum_new_job_message_format, message)
+            if parsed:
+                jobs += 1
+                entry = ethminer_service.get_next()
+                continue
+
             cuda_solution_found_message_format = (
                 "  ℹ  {}|CUDA{}     Solution found; Submitting to {}")
             parsed = parse(cuda_solution_found_message_format, message)
             if parsed:
-                REQUEST_SOLUTIONS.inc()
+                solutions += 1
                 entry = ethminer_service.get_next()
                 continue
 
@@ -67,19 +81,23 @@ def main():
                 "  ℹ  {}|stratum    B-) Submitted and accepted{}")
             parsed = parse(stratum_solution_accepted_format, message)
             if parsed:
-                REQUEST_SHARES.inc()
-                entry = ethminer_service.get_next()
-                continue
-
-            stratum_new_job_message_format = (
-                "  ℹ  {}|stratum   Received new job {}")
-            parsed = parse(stratum_new_job_message_format, message)
-            if parsed:
-                REQUEST_JOBS.inc()
+                shares += 1
                 entry = ethminer_service.get_next()
                 continue
 
             entry = ethminer_service.get_next()
+
+        REQUEST_JOBS.observe(jobs)
+        REQUEST_SOLUTIONS.observe(solutions)
+        REQUEST_SHARES.observe(shares)
+
+        print(
+            "Reporting:\n"
+            "\tHashrate: {} Mh/s\n"
+            "\tObserved {} jobs\n"
+            "\tObserved {} solutions\n"
+            "\tObserved {} shares\n"
+            .format(total_hashrate, jobs, solutions, shares))
 
 
 def valid(entry, t0, t1):
